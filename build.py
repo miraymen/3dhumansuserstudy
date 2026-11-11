@@ -5,6 +5,7 @@ and the results are labelled A-F in the order shown.
 """
 import html
 import json
+import random
 import sys
 from pathlib import Path
 
@@ -75,14 +76,7 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 """
 
 JS = """
-function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-const inner = document.querySelector('.inner');
-shuffle(Array.from(document.querySelectorAll('.person'))).forEach((p, i) => { inner.appendChild(p); p.dataset.num = i + 1;
-  p.querySelector('.subj').textContent = 'Subject ' + (i + 1); });
-document.querySelectorAll('.results').forEach(r => {
-  shuffle(Array.from(r.children)).forEach((c, i) => { r.appendChild(c); const t = c.querySelector('.tile'), b = c.querySelector('.pick');
-    if (t) t.dataset.label = 'ABCDEF'[i]; if (b) b.textContent = 'ABCDEF'[i]; });
-});
+
 const io = new IntersectionObserver(es => es.forEach(e => {
   const v = e.target; if (e.isIntersecting) { if (!v.src) v.src = v.dataset.src; if (!paused && v.closest('.person').dataset.paused !== '1') v.play().catch(() => {}); } else v.pause();
 }), { rootMargin: '300px 0px' });
@@ -149,8 +143,8 @@ progress();
 """
 
 
-def vtile(it, person, aspect, cls, label):
-    rid = f' data-rid="{it["id"]}"' if label else ""
+def vtile(it, person, aspect, cls, label, letter=""):
+    rid = f' data-rid="{it["id"]}" data-label="{letter}"' if label else ""
     flex = ""
     return (f'<div class="tile {cls}"{rid} style="{flex}aspect-ratio: {aspect:.4f};" data-full="{it["full"]}" '
             f'><video data-src="{it["src"]}" poster="{it["poster"]}" muted loop playsinline preload="none"></video></div>')
@@ -160,14 +154,19 @@ def main():
     n = M["n_results"]
     colhead = (f'<div style="flex: {AC:.4f} 1 0;">Input video</div>'
                f'<div style="flex: {n * AR:.4f} 1 0;">Six 3D reconstructions (random order)</div>')
-    rows = []
-    for p in M["people"]:
+    rows, order = [], []
+    rng = random.Random(20261111)                    # ONE randomisation, the same for every participant and every rebuild
+    people = list(M["people"]); rng.shuffle(people)
+    for num, p in enumerate(people, 1):
+        res_items = list(p["results"]); rng.shuffle(res_items)
+        order.append(dict(subject=num, subject_id=p["id"], labels={"ABCDEF"[i]: r["id"] for i, r in enumerate(res_items)}))
         cell = lambda inner: f'<div class="cell">{inner}</div>'
-        res = [cell(vtile(r, "", AR, "", True) + '<button class="pick" type="button"></button>') for r in p["results"]]
+        res = [cell(vtile(r, "", AR, "", True, "ABCDEF"[i]) + f'<button class="pick" type="button">{"ABCDEF"[i]}</button>')
+               for i, r in enumerate(res_items)]
         res += [cell(f'<div class="tile na" style="aspect-ratio: {AR:.4f};">{html.escape(PENDING)}</div>')] * (n - len(res))
         form = '<div class="form"><button class="submit" disabled>Submit</button><span class="msg"></span></div>'
         question = f'<p class="q">{html.escape(QUESTION)}</p>'
-        rows.append(f'<section class="person" data-person="{p["id"]}"><div class="pname"><h2 class="subj"></h2></div>{question}'
+        rows.append(f'<section class="person" data-person="{p["id"]}" data-num="{num}"><div class="pname"><h2 class="subj">Subject {num}</h2></div>{question}'
                     f'<div class="clipwrap">{vtile(p["clip"], "", AC, "clip", False)}</div>'
                     f'<div class="sctl"><button class="srestart" type="button">Restart together</button><button class="spause" type="button">Pause</button></div>'
                     f'<div class="results">{"".join(res)}</div>{form}</section>')
@@ -183,6 +182,8 @@ def main():
 </body></html>
 """
     (HERE / "index.html").write_text(page)
+    json.dump(dict(seed=20261111, note="the fixed order every participant sees: subject number -> subject id, letter -> result id "
+                   "(methods and people: study_key.json)", order=order), open(HERE / "study_order.json", "w"), indent=1)
     print("index.html", len(page), "bytes,", len(M["people"]), "people")
 
 

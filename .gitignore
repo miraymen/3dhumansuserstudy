@@ -5,3 +5,4 @@ cache/
 study_key.json
 prepare_media.py
 face_boxes.py
+study_order.json
