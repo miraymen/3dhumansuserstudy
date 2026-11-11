@@ -32,22 +32,27 @@ header p { color: var(--muted); margin: 0 0 10px; max-width: 900px; }
 .controls { max-width: 1100px; margin: 0 auto; padding: 8px 16px 18px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; }
 button:hover { border-color: var(--accent); color: var(--accent); }
-.grid { padding: 0 16px 64px; overflow-x: auto; }
-.inner { min-width: 1100px; }
+.grid { padding: 0 16px 64px; }
+.inner { max-width: 1240px; margin: 0 auto; }
+.cols button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 .colhead { position: sticky; top: 0; z-index: 5; background: var(--bg); display: flex; gap: 6px; padding: 8px 0 6px; border-bottom: 1px solid var(--line); }
 .colhead div { font-size: 13px; font-weight: 600; color: var(--muted); text-align: center; }
-.person { margin-top: 44px; }
+.person { margin-top: 56px; padding-top: 8px; border-top: 1px solid var(--line); }
 .pname { display: flex; gap: 12px; align-items: baseline; margin: 0 0 8px; }
 .pname h2 { font-size: 18px; margin: 0; }
 .pname a { color: var(--accent); font-size: 13px; text-decoration: none; }
-.row { display: flex; gap: 6px; align-items: flex-start; }
-.cell { display: flex; flex-direction: column; gap: 6px; }
+.body { display: flex; gap: 20px; align-items: center; }
+.clipwrap { flex: 0 0 30%; }
+.body .results { flex: 1 1 0; min-width: 0; }
+@media (max-width: 800px) { .body { flex-direction: column; align-items: stretch; } .clipwrap { flex: none; } }
+.results { display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); gap: 16px; }
+@media (max-width: 700px) { .results { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
+.cell { display: flex; flex-direction: column; gap: 8px; }
 .cell .tile { width: 100%; }
 .pick { width: 100%; font-weight: 700; font-size: 16px; padding: 6px 0; }
 .pick.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
 .pick:disabled { opacity: 0.45; cursor: default; }
 .q { font-weight: 600; margin: 0 0 8px; }
-.results { display: flex; gap: 6px; }
 .tile { position: relative; background: #fff; border-radius: 4px; overflow: hidden; cursor: zoom-in; }
 .tile video { display: block; width: 100%; height: 100%; object-fit: contain; background: #fff; }
 .tile.clip video { object-fit: cover; background: #000; }
@@ -81,13 +86,19 @@ document.querySelectorAll('.results').forEach(r => {
     if (t) t.dataset.label = 'ABCDEF'[i]; if (b) b.textContent = 'ABCDEF'[i]; });
 });
 const io = new IntersectionObserver(es => es.forEach(e => {
-  e.target.querySelectorAll('video').forEach(v => { if (e.isIntersecting) { if (!v.src) v.src = v.dataset.src; v.play().catch(() => {}); } else v.pause(); });
-}), { rootMargin: '200px 0px' });
-document.querySelectorAll('.row').forEach(r => io.observe(r));
-document.getElementById('sync').onclick = () => document.querySelectorAll('.results video').forEach(v => { if (v.src) { v.currentTime = 0; v.play().catch(() => {}); } });
+  const v = e.target; if (e.isIntersecting) { if (!v.src) v.src = v.dataset.src; if (!paused) v.play().catch(() => {}); } else v.pause();
+}), { rootMargin: '300px 0px' });
 let paused = false;
+document.querySelectorAll('.tile video').forEach(v => io.observe(v));
+function setCols(n) { document.documentElement.style.setProperty('--cols', n);
+  document.querySelectorAll('.cols button').forEach(b => b.classList.toggle('on', b.dataset.n === String(n)));
+  try { localStorage.setItem('study_cols', n); } catch (e) {} }
+document.querySelectorAll('.cols button').forEach(b => b.onclick = () => setCols(b.dataset.n));
+let c0 = 2; try { c0 = localStorage.getItem('study_cols') || 2; } catch (e) {}
+setCols(c0);
+document.getElementById('sync').onclick = () => document.querySelectorAll('.results video').forEach(v => { if (v.src) { v.currentTime = 0; v.play().catch(() => {}); } });
 document.getElementById('pause').onclick = e => { paused = !paused; e.target.textContent = paused ? 'Play all' : 'Pause all';
-  document.querySelectorAll('.row video').forEach(v => paused ? v.pause() : (v.src && v.play().catch(() => {}))); };
+  document.querySelectorAll('.tile video').forEach(v => paused ? v.pause() : (v.src && v.play().catch(() => {}))); };
 const lb = document.getElementById('lb'), body = document.getElementById('lbbody'), cap = document.getElementById('lbcap');
 function closeLb() { lb.classList.remove('on'); body.innerHTML = ''; }
 document.querySelectorAll('.tile[data-full]').forEach(t => t.onclick = () => {
@@ -140,7 +151,7 @@ progress();
 
 def vtile(it, person, aspect, cls, label):
     rid = f' data-rid="{it["id"]}"' if label else ""
-    flex = "" if label else f"flex: {aspect:.4f} 1 0; "
+    flex = ""
     return (f'<div class="tile {cls}"{rid} style="{flex}aspect-ratio: {aspect:.4f};" data-full="{it["full"]}" '
             f'><video data-src="{it["src"]}" poster="{it["poster"]}" muted loop playsinline preload="none"></video></div>')
 
@@ -151,21 +162,21 @@ def main():
                f'<div style="flex: {n * AR:.4f} 1 0;">Six 3D reconstructions (random order)</div>')
     rows = []
     for p in M["people"]:
-        cell = lambda inner: f'<div class="cell" style="flex: {AR:.4f} 1 0;">{inner}</div>'
+        cell = lambda inner: f'<div class="cell">{inner}</div>'
         res = [cell(vtile(r, "", AR, "", True) + '<button class="pick" type="button"></button>') for r in p["results"]]
         res += [cell(f'<div class="tile na" style="aspect-ratio: {AR:.4f};">{html.escape(PENDING)}</div>')] * (n - len(res))
         form = '<div class="form"><button class="submit" disabled>Submit</button><span class="msg"></span></div>'
         question = f'<p class="q">{html.escape(QUESTION)}</p>'
         rows.append(f'<section class="person" data-person="{p["id"]}"><div class="pname"><h2 class="subj"></h2></div>{question}'
-                    f'<div class="row">{vtile(p["clip"], "", AC, "clip", False)}'
-                    f'<div class="results" style="flex: {n * AR:.4f} 1 0;">{"".join(res)}</div></div>{form}</section>')
+                    f'<div class="body"><div class="clipwrap">{vtile(p["clip"], "", AC, "clip", False)}</div>'
+                    f'<div class="results">{"".join(res)}</div></div>{form}</section>')
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(M['title'])}</title><style>{CSS}</style></head>
 <body>
 <header><h1>{html.escape(M['title'])}</h1>{f'<p class="status">{html.escape(STATUS)}</p>' if STATUS else ''}{''.join(f'<p>{html.escape(t)}</p>' for t in M['intro'])}</header>
-<div class="controls"><button id="sync">Restart turntables together</button><button id="pause">Pause all</button><span class="progress" id="progress"></span></div>
-<div class="grid"><div class="inner"><div class="colhead">{colhead}</div>{''.join(rows)}</div></div>
+<div class="controls"><button id="sync">Restart turntables together</button><button id="pause">Pause all</button><span class="cols">Videos per row: <button data-n="2">2</button> <button data-n="3">3</button></span><span class="progress" id="progress"></span></div>
+<div class="grid"><div class="inner">{''.join(rows)}</div></div>
 <div class="lb" id="lb"><button class="x" aria-label="close">×</button><div id="lbbody"></div><div class="cap" id="lbcap"></div></div>
 <script>const FORM = {json.dumps(FORM)}, VERSION = {json.dumps(VERSION)};{JS}{FORM_JS}</script>
 </body></html>
