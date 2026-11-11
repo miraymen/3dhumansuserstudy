@@ -56,7 +56,8 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 .tile .lab { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.62); color: #fff; font-size: 13px; font-weight: 700;
              border-radius: 4px; padding: 1px 7px; pointer-events: none; }
 .tile.na { cursor: default; display: flex; align-items: center; justify-content: center; color: #888; font-size: 13px; }
-.form { display: flex; gap: 12px; align-items: center; margin: 12px 0 0; }
+.form { display: flex; gap: 12px; align-items: center; justify-content: center; margin: 16px 0 0; }
+.sctl { display: flex; gap: 10px; justify-content: center; margin: 0 0 14px; }
 .form .q { font-weight: 600; margin-right: 6px; }
 .form .choices button { min-width: 38px; font-weight: 700; }
 .form .choices button.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -83,12 +84,19 @@ document.querySelectorAll('.results').forEach(r => {
     if (t) t.dataset.label = 'ABCDEF'[i]; if (b) b.textContent = 'ABCDEF'[i]; });
 });
 const io = new IntersectionObserver(es => es.forEach(e => {
-  const v = e.target; if (e.isIntersecting) { if (!v.src) v.src = v.dataset.src; if (!paused) v.play().catch(() => {}); } else v.pause();
+  const v = e.target; if (e.isIntersecting) { if (!v.src) v.src = v.dataset.src; if (!paused && v.closest('.person').dataset.paused !== '1') v.play().catch(() => {}); } else v.pause();
 }), { rootMargin: '300px 0px' });
 let paused = false;
 document.querySelectorAll('.tile video').forEach(v => io.observe(v));
 
 document.getElementById('sync').onclick = () => document.querySelectorAll('.results video').forEach(v => { if (v.src) { v.currentTime = 0; v.play().catch(() => {}); } });
+document.querySelectorAll('.person').forEach(sec => {
+  const pb = sec.querySelector('.spause'), rb = sec.querySelector('.srestart'), vids = () => Array.from(sec.querySelectorAll('video'));
+  pb.onclick = () => { const on = sec.dataset.paused !== '1'; sec.dataset.paused = on ? '1' : '0'; pb.textContent = on ? 'Play' : 'Pause';
+    vids().forEach(v => on ? v.pause() : (v.src && v.play().catch(() => {}))); };
+  rb.onclick = () => { sec.dataset.paused = '0'; pb.textContent = 'Pause';
+    sec.querySelectorAll('.results video').forEach(v => { if (!v.src) v.src = v.dataset.src; v.currentTime = 0; v.play().catch(() => {}); }); };
+});
 document.getElementById('pause').onclick = e => { paused = !paused; e.target.textContent = paused ? 'Play all' : 'Pause all';
   document.querySelectorAll('.tile video').forEach(v => paused ? v.pause() : (v.src && v.play().catch(() => {}))); };
 const lb = document.getElementById('lb'), body = document.getElementById('lbbody'), cap = document.getElementById('lbcap');
@@ -161,6 +169,7 @@ def main():
         question = f'<p class="q">{html.escape(QUESTION)}</p>'
         rows.append(f'<section class="person" data-person="{p["id"]}"><div class="pname"><h2 class="subj"></h2></div>{question}'
                     f'<div class="clipwrap">{vtile(p["clip"], "", AC, "clip", False)}</div>'
+                    f'<div class="sctl"><button class="srestart" type="button">Restart together</button><button class="spause" type="button">Pause</button></div>'
                     f'<div class="results">{"".join(res)}</div>{form}</section>')
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
