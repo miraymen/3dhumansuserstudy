@@ -1,7 +1,7 @@
 {
  "title": "3D humans: a user study",
  "intro": [
-  "Each subject is a person in a short video (left) and six 3D reconstructions of that person, labelled A to F in a random order; each turns once in 12 seconds.",
+  "Each subject is a person in a short video (top) and, below it, six 3D reconstructions of that person, labelled A to F; each turns once in 12 seconds.",
   "For each person, choose the reconstruction that looks most like the person in the video and press Submit. Click any video to see it at full resolution."
  ],
  "people": [
