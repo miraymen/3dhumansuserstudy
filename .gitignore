@@ -4,3 +4,4 @@ cache/
 .salt
 study_key.json
 prepare_media.py
+face_boxes.py
