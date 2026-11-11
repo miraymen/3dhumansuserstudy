@@ -155,10 +155,18 @@ def main():
     colhead = (f'<div style="flex: {AC:.4f} 1 0;">Input video</div>'
                f'<div style="flex: {n * AR:.4f} 1 0;">Six 3D reconstructions (random order)</div>')
     rows, order = [], []
-    rng = random.Random(20261111)                    # ONE randomisation, the same for every participant and every rebuild
-    people = list(M["people"]); rng.shuffle(people)
-    for num, p in enumerate(people, 1):
-        res_items = list(p["results"]); rng.shuffle(res_items)
+    byid = {p["id"]: p for p in M["people"]}
+    if (HERE / "study_order.json").exists():          # the fixed order (subject order + letters), kept across rebuilds
+        fixed = json.load(open(HERE / "study_order.json"))["order"]
+        plan = [(byid[e["subject_id"]], [next(r for r in byid[e["subject_id"]]["results"] if r["id"] == e["labels"][L])
+                                         for L in "ABCDEF" if L in e["labels"]]) for e in fixed]
+    else:                                             # first build: ONE randomisation, the same for every participant
+        rng = random.Random(20261111)
+        people = list(M["people"]); rng.shuffle(people)
+        plan = []
+        for p in people:
+            r_ = list(p["results"]); rng.shuffle(r_); plan.append((p, r_))
+    for num, (p, res_items) in enumerate(plan, 1):
         order.append(dict(subject=num, subject_id=p["id"], labels={"ABCDEF"[i]: r["id"] for i, r in enumerate(res_items)}))
         cell = lambda inner: f'<div class="cell">{inner}</div>'
         res = [cell(vtile(r, "", AR, "", True, "ABCDEF"[i]) + f'<button class="pick" type="button">{"ABCDEF"[i]}</button>')
@@ -182,8 +190,9 @@ def main():
 </body></html>
 """
     (HERE / "index.html").write_text(page)
-    json.dump(dict(seed=20261111, note="the fixed order every participant sees: subject number -> subject id, letter -> result id "
-                   "(methods and people: study_key.json)", order=order), open(HERE / "study_order.json", "w"), indent=1)
+    if not (HERE / "study_order.json").exists():
+        json.dump(dict(seed=20261111, note="the fixed order every participant sees: subject number -> subject id, letter -> result id "
+                       "(methods and people: study_key.json)", order=order), open(HERE / "study_order.json", "w"), indent=1)
     print("index.html", len(page), "bytes,", len(M["people"]), "people")
 
 
